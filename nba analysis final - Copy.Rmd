@@ -1,0 +1,377 @@
+---
+title: "NBA Shooting Data Analysis (2014-2015 Season)"
+author: "Aeshah Altharbani"
+email: AltharbaniA@cardiff.ac.uk
+date: "10 February 2021"
+fontsize: 11pt
+fontfamily: times
+geometry: margin=1in
+output:
+  bookdown::pdf_document2:
+    toc: true
+    number_sections: true
+    keep_tex: true 
+    citation_package: natbib
+    fig_caption: true 
+    highlight: haddock 
+    df_print: kable
+    extra_dependencies:
+      caption: ["labelfont={bf}"]
+bibliography: [refs.bib]
+biblio-style: apalike
+link-citations: true
+abstract: This report aims to analyse a National Basketball Association (NBA) dataset and produce meaningful results using both descriptive and inferential analysis. This report will explain how the study was performed, discuss the theory used, analyse several areas of the dataset, and evaluate the results. We will explore the critical factors affecting NBA players' shots, starting with an analysis of correlations between the different related variables. We will focus on the conditions under which players take shots. In addition to reviewing data about the best shooter and defender, we analyse whether playing at home has an impact on players' behaviour.
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+library(tidyverse)
+library(kableExtra)
+knitr::opts_chunk$set(echo = TRUE,warning=FALSE,fig.pos = 'H')
+
+```
+
+```{r, include=FALSE}
+library(corrplot)
+library(Hmisc)
+library(car)
+library(ppcor)
+library(ggpubr)
+ 
+# read data
+nba <- read.csv("~/dataset_up.csv", header=TRUE)
+
+```
+
+<!-- main body starts here -->
+
+\newpage
+# Introduction {#intro}
+
+The National Basketball Association (NBA) data used in this study is a summary of the shots taken during the 2014-2015 NBA regular season. The data consist of $128,609$ rows and $23$ columns and include some missing and unexpected values, so a pre-processing stage was necessary to obtain meaningful values. Column headings are generally self-explanatory and contain the following data:
+
+```{r , echo = FALSE, fig.align = "left"}
+nn<- names(nba)[1:6]
+mm<- names(nba)[7:12]
+vv<- names(nba)[13:18]
+rr<- names(nba)[18:23]
+knitr::kable(list(nn,mm,vv,rr),
+             caption = "Colums Names") %>%
+  kable_styling(latex_options = "hold_position")
+```
+
+The data contains the full range of shooting attempts by each team and each player during the 2014-2015 NBA season in regular matches throughout the year. Each player's name, ID number, position, number of shots, and distance between the player and the basket or closest defender are included. The dataset consists of $904$ games played either at home or away.
+However, while exploring the dataset, we found several limitations. It includes only regular season matches and not qualifiers or other matches during the year such as playoff and championship games . Free throw shots and final match scores are also not included.
+
+
+# Background {#sec:background}
+The NBA is a North American professional basketball league. The league consists of $30$ teams ($29$ in the United States and one in Canada) and is one of the four main professional sports leagues in the United States and Canada. It is the world's premier basketball league for men.
+The league was founded in New York City on June 6, 1946 as the Basketball Association of America (BAA). It changed its name to the National Basketball Association on August 3, 1949 after its merger with the National Basketball League (NBL). The regular NBA season lasts from October to April, with each team playing $82$ matches. The playoff tournament runs until June. As of 2020, NBA players are the best-paid athletes in the world, with an average annual salary of $10,000,000$USD per player.In North America, the NBA is the third-richest professional sports league by revenue, after the National Football League (NFL) and Major League Baseball (MLB), and it is among the world's top four richest.
+
+
+# Factors related to successful shots{#sec:Factors-success}
+
+Some parameters related to the success of a shot are the time left on the shot clock (Shot_Clock) and the type of shot (Shot_Type). The next parameters we will consider are touch time (Touch_Time) and distance from the net (Shot_Distance). We also have data about the shooter's distance from the nearest defender and whether the shot was successful. 
+
+## Players' shooting type vs shot distance{#sec:Player-distance} 
+
+In the 2014-2015 season, there was still a considerable difference in the number of two-point and three-point shots. Two-point shots represent about three quarters of the total number of shots taken, as shown in Figure \@ref(fig:boxp-pts-typ).
+
+
+```{r boxp-pts-typ, echo = FALSE, fig.height = 3, fig.width = 5, fig.cap = "boxplot represents the difference in the number of two-points and three-points.", fig.align = "center"}
+##poxplot for grpubed by pts type 
+nba%>%
+  ggplot(aes(SHOT_DIST,fill=factor(PTS_TYPE)))+
+  geom_boxplot(alpha=0.5,lwd=0.2)+
+  theme_minimal()+
+  xlab("Shot Distance")+
+  ylab("")+
+  guides(fill=guide_legend(title="Shot Type"))
+
+```
+
+Distance from the net is one of the main characteristics of a shot. It is easy to assume that shots taken from closer to the basket are easier.Figure \@ref(fig:made-missed) presents the distribution of shots distance, which shows that most shots are made from $5$ feet from the basket. This distribution is bimodal and shows that most shots were taken between the shortest possible distance for three-point throws, which is from the bow $23.75$ feet from the basket, or $5-9$ feet from the basket. The reason for this is a drop in efficiency for mid-range shots, which can be linked to the defence collapsing into the paint (the area directly in front of the basket). By taking a closer look at the distribution of missed shots according to the shooting distance, we can see that most missed shots are taken from between about $23$ and $26$ feet. That means the higher the shooting distance of a three-point shot attempt, the more likely the shot is to miss.
+
+```{r, echo=FALSE}
+sample_size <- nrow(nba)
+made <- nba$SHOT_DIST[nba$SHOT_RESULT == "made"]
+missed <- nba$SHOT_DIST[nba$SHOT_RESULT == "missed"]
+
+```
+
+
+```{r made-missed, echo = FALSE, fig.height = 3, fig.width = 6, fig.cap = "'made' and 'missed' shots distributions with the shot distance.", fig.align = "center"}
+options(repr.plot.width=10, repr.plot.height=5)
+
+par(mfrow=c(1,2))
+hist(made, freq=TRUE, col='green1',
+        xlab="Distance (feet)" )
+
+hist(missed, freq=TRUE, col='violet',
+        xlab="Distance (feet)" )
+```
+
+We test the variance between "made" and "missed" variables using an $F$-test. The level of statistical significance is often expressed as a p-value between $0$ and $1$: the smaller the p-value, the more substantial the evidence that you should reject the null hypothesis. We observe a p-value of less than $0.05$, which is statistically significant. This indicates there is strong evidence against the null hypothesis, so we reject it and accept the alternative hypothesis.
+
+
+
+## Defender distance{#sec:Defender-dist}
+
+The next parameter that we will check is the closest defender distance. The distribution in Figure \@ref(fig:defer-dist) shows clearly that the closer the defender gets, the more difficult it is for the player to hit the net. We can also see that most of the shots were taken within $5$ feet,  whilst most of the missed shots were taken at that range as well. The number of missed shots is much higher within the $10$-foot range than for the shots taken outside of it. This means that the more space a shooter has, the more likely he is to score three points. Looking at the defenders' average distance from the shooters, it is also clear that the defenders of the failed groups were $0.6$ feet closer to the shooter than the successful groups' defenders.
+
+
+```{r defer-dist, echo = FALSE, fig.height = 5, fig.width = 10, fig.cap = "histograms represent the distance of the closest defender and count the shots number whether it made or missed.", fig.align = "center"}
+
+counts <- table(nba$SHOT_RESULT, nba$CLOSE_DEF_DIST)
+barplot(counts,
+  xlab="closer defender distance", col=c("lightblue","limegreen"),
+  ylab='shots number',
+  legend = rownames(counts))
+```
+\newpage
+## Correlations while controlling for touch time{#sec:Corr-time} 
+
+Figure \@ref(fig:drib-time) shows that there is no clear correlation between a player's shot percentage, number of dribbles, and touch time. NBA playeys typically have a higher shot percentage when they catch the ball (zero dribbles) than in cases with dribbling and long touch times, although the defenders could be more effective in cases with longer touch times.
+
+```{r drib-time, echo = FALSE, fig.height= 4, fig.width = 7, fig.cap = "The relationship between players' dribbling times, touch time and shot results.", fig.align = "center"}
+
+bp<-ggplot(nba, aes(x = DRIBBLES , y = TOUCH_TIME)) +
+   geom_point(aes(color=factor(SHOT_RESULT)))+ylim(5,20)+scale_color_manual(values = c("#E7B800", "#FC4E07")) 
+bp
+```
+We define the indices of the $n$ most extensive entries of a vector $x$, then take the $1000$ points with the highest Touch_Time. We find that these points were scored in the $0-8$ second range for Shot_Clock and in the $0-31$ foot range for Shot _Dist. The highest Touch_Times are in the range of $16-25$ seconds. For Final_Margin, the range is $15-41$, as shown in Figure \@ref(fig:touch-final).
+Thus, we obtain statistically significant correlations between scoring and Final_Margin and scoring and Shot_Clock (and these partial correlations are positive).
+
+```{r, echo=FALSE}
+sample_size <- nrow(nba)
+top <- function(x, n){
+
+    result <- numeric()
+
+    for(i in 1:n){
+
+        j <- which.max(x)
+
+        result[i] <- j
+
+        x[j] <- -Inf
+}
+
+    result
+
+}
+
+N_top <- 1000
+
+
+
+Top_touch <- top(nba$TOUCH_TIME, N_top)
+
+Is_Top <- rep(0,sample_size)
+
+Is_Top[Top_touch] <- 1 
+
+```
+
+```{r touch-final, echo = FALSE, fig.height = 5, fig.width = 7, fig.cap = "Correlations while controlling for a touch time.", fig.align = "center"}
+color<-c('yellow', 'orange')[factor(Is_Top)] 
+
+
+
+plot(nba[,c(10,16)], type='p', 
+
+     pch=c(21, 22)[factor(Is_Top)],  
+
+     bg=color, cex=2.5)
+
+legend('topright', 
+
+       c('Non-top', 'top'),
+
+       horiz='TRUE', inset=0.03, 
+
+       pch=22:23, 
+
+       pt.bg=c('yellow', 'orange'), 
+
+       pt.cex=2.5 )
+
+```
+
+
+# Differences in the mean Final_margin as a function of Date{#sec:Diff-date}
+
+Fligner and Bartlett tests were applied to examine the homogeneity .of the variances, and they returned p-values $< 2.2e-16$, which indicates a significant result (the typical limit is $0.05$, and anything smaller is considered statistically significant).
+
+```{r, echo = FALSE}
+nba$DATE <- factor(nba$DATE)
+fligner.test(FINAL_MARGIN ~ DATE, data=nba)
+```
+```{r, echo = FALSE}
+bartlett.test(FINAL_MARGIN ~ DATE, data=nba)
+```
+Next, we apply `one-way` ANOVA to see if there is a large variation in Final_ margin depending on the date. It returns a very small p-value, which indicates a statistically significant difference. 
+
+```{r, echo = FALSE}
+# Compute the analysis of variance
+
+res.aov1 <- aov(FINAL_MARGIN ~ DATE, data=nba)
+
+oneway.test(FINAL_MARGIN ~ DATE, data=nba)
+```
+The plots of residuals versus fits are used to check the homogeneity of variances. Figure \@ref(fig:aov1-test) shows no evident relationships between residuals and fitted values (each group's mean).
+
+```{r aov1-test, echo = FALSE, fig.height = 4, fig.width = 7, fig.cap = "plot of residuals versus fits to check the homogeneity of variances.", fig.align = "center"}
+plot(res.aov1, 3)
+
+```
+
+## Mean shots scored during the season{#sec:mean-season}
+
+Figure \@ref(fig:count-shots) shows the $95$% confidence intervals (CIs) for the mean Shot_Dist for the 2014-2015 year, which suggest that the mean shots scored from the beginning of 2014 to the beginning of 2015 are in the same range. However, the mean is less at the end of 2015. We can also observe that one of Shot_Number counts also has relatively high averages.
+
+
+```{r, echo = FALSE}
+
+mean_Pts_Year <- matrix(0, 22, 2)
+
+numb_noti <- rep(0,22)
+
+```
+
+```{r, echo = FALSE}
+for (i in 0:21){
+    noti <- nba$SHOT_DIST[nba$SHOT_NUMBER == (3 + i)]
+
+    numb_noti[i+1] <- length(noti)
+
+    C_mean <- t.test(noti, conf.level=0.95)$conf.int
+
+    mean_Pts_Year[i+1,] <- C_mean
+
+}
+
+```
+
+```{r, echo = FALSE}
+
+Max_Y<-max(mean_Pts_Year)
+
+Min_Y<-min(mean_Pts_Year)
+
+```
+
+```{r count-shots, echo = FALSE, fig.height = 4, fig.width = 7, fig.cap = "confidence intervals (CIs) for the mean Shot Dist of the season.", fig.align = "center"}
+
+
+plot(1:22, mean_Pts_Year[,1], 
+
+     type='p', pch=3, lwd=3, col='purple',
+
+     ylim=c(Min_Y, Max_Y), 
+
+     ylab='Mean', 
+
+     xaxt='n', xlab='',
+
+     main='Mean shot distance (95% conf.)')
+```
+
+## Home court advantage{#sec:home-court}
+
+Playing at home versus away may influence players' shooting; the variables we consider here include location (home or away), number of field attempts to target FGM, and the hit rate constructed by FGM. The results presented in Table 2 show that there is no significant difference in the shooting rate of home and away teams, but the existing difference of $0.8$ percentage points is enough to reverse victory and defeat; the comparison of the wins and losses of home and away teams in Figure \@ref(fig:hom-away) shows thousands more wins in the home court.
+
+```{r perc-ret, echo = FALSE, fig.align = "left"}
+home_away<-nba %>% group_by(LOCATION) %>% 
+     summarise(PERCENTAGE=sum(FGM)/length(FGM)*100)
+knitr::kable(home_away,
+             caption = "Percentage of shooting rate") %>%
+  kable_styling(latex_options = "hold_position")
+```
+
+```{r hom-away, echo = FALSE, fig.height = 3, fig.width = 4, fig.cap = "comparing the number of Home OR Away games aginst W(winning).", fig.align = "center"}
+
+wins<-nba %>% group_by(GAME_ID,LOCATION) %>% filter(W=='W',FGM  # comparing the number of H OR A games aginst W(winning)
+  ==1)
+ggplot(data=wins,aes(LOCATION,fill=factor(W)))+geom_bar(color='limegreen',fill='lightblue')
+```
+## Best players{#sec:best-player}
+
+This section will present the analysis of the best shooter of the season. Although the Table below shows the five players with the highest number of shots, the best shooter does not necessarily take the most shots; we must also consider the number of points earned for each shot, with three-point shots differing from shots taken from five feet. When shots are counted in terms of points, Stephen Curry scored the most at $1130$. However, he took only the eighth highest number of shots, which means he uses successful tactics when choosing the type of shot to take.
+
+```{r, echo = FALSE,fig.align = "left"}
+#plot the shot number for each player 
+nba %>%
+  group_by(PLAYER_NAME) %>%
+  summarise(SHOT_NUMBER = n()) %>%
+  ungroup %>%
+  arrange(desc(SHOT_NUMBER)) %>%
+  head(5)
+
+```
+
+```{r, echo = FALSE,fig.align = "left"}
+shots_made=subset(nba,SHOT_RESULT=="made")
+result2=aggregate(PTS~PLAYER_NAME,shots_made,sum)
+result2=result2[order(result2$PTS),]
+#Player who scored maximum points
+tt <- tail(result2,n=1)
+knitr::kable(tt,
+             caption = "the best shooter")%>%
+  kable_styling(latex_options = "hold_position")
+```
+We also examined the defenders who faced these shooters and stopped the most shots.the Table below shows the five best defenders for the season, with Serge Ibaka being the most successful defender.
+
+```{r, echo = FALSE,fig.align = "left"}
+nba %>%
+ filter(SHOT_RESULT=="missed") %>%
+ group_by(CLOSEST_DEFENDER) %>%
+ summarise(GoodDefense = n()) %>%
+ ungroup %>%
+ arrange(desc(GoodDefense)) %>%
+head(5)
+
+```
+
+# Partial correlation between the most related features{#sec:parti-feature}
+
+To explore the relationships between the various features of the NBA dataset, we perform a partial correlation analysis. The computed partial correlations are explained in Figure \@ref(fig:corr-most).
+
+```{r , echo = FALSE}
+shotcor<- nba[c("SHOT_NUMBER","PERIOD",'SHOT_CLOCK','DRIBBLES','TOUCH_TIME','SHOT_DIST','PTS_TYPE')]
+res <- cor(shotcor)
+```
+
+```{r corr-most, echo = FALSE, fig.height = 5, fig.width = 6, fig.cap = "Graphical representation of the partial correlations between Shot number-Period-Shot Clock-Dribbles- Shot time-Shot Distance and Pts Type.", fig.align = "center"}
+corrplot(res, order = "hclust", 
+         tl.col = "black", tl.srt = 45)
+```
+
+We observe only a few relatively strong correlations between pairs of features. In particular:
+
+* Shot_Dist and Shot_Clock are negatively correlated,
+* Shot_Dist and Pts_Type are positively correlated,
+* Dribbles and Touch_Time are positively correlated, and
+* Shot_Clock and Pts_Type are positively correlated.
+
+These correlations confirm our investigation presented in the first sections, which is not surprising and appears to be as evident as the relationship between touch time and dribbles.
+
+\newpage
+# Conclusion{#sec:conclusion}
+
+This report showed the mathematical and statistical analysis of a dataset from the NBA containing information about the 2014-2015 NBA season. We identified and studied the most important features of a successful shot, using various statistical tools to explore the dataset. We performed some correlation analyses and some tests on means and variances using the $t$-test, $F$-test, and $ANOVA$, along with various other tests  such as $Fligner$ and $Bartlett$ to examine the conditions. We also calculated $confidence intervals$ for certain means and differences.
+To summarise the information obtained by this report, we can say:
+1.The more space the defender grants to the player, the higher the likelihood that the player will score a three-point shot depending on shooting distance.
+2. The greater the distance from which a player takes a three-point shot, the lower the success rate.
+3.The three-point shot success rate is higher when the touch time is low.
+4. Playing on the home court is beneficial in terms of the likelihood of winning.
+
+For further investigations of the same dataset, we recommend building and training different models to predict the probability of a shot's success under many conditions and to determine whether a shot should be taken or not.
+
+# References {#sec:references}
+
++ National Basketball Association[Wikipedia[https://en.wikipedia.org/wiki/National_Basketball_Association]
++ NBA Games - All NBA matchups  NBA.com[https://www.nba.com/games]
++ One way ANOVA[http://www.sthda.com/english/wiki/one-way-anova-test-in-r]
+
+
